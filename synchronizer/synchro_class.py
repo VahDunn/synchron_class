@@ -58,14 +58,14 @@ class DatabaseSynchronizer:
             source_table = Table(table_name, self.source_metadata, autoload_with=self.source_engine)
             target_table = Table(table_name, self.target_metadata, autoload_with=self.target_engine)
 
-            # Получаем данные из исходной таблицы
+
             with self.source_engine.connect() as source_conn:
                 source_data = source_conn.execute(select(source_table)).fetchall()
 
-            # Получаем первичный ключ таблицы
+
             primary_key_columns = [key.name for key in source_table.primary_key]
 
-            # Обновляем данные в целевой таблице
+
             with self.target_engine.connect() as target_conn:
                 for row in source_data:
                     # Создаем условие для поиска записи по первичному ключу
@@ -73,13 +73,13 @@ class DatabaseSynchronizer:
                         col: getattr(row, col) for col in primary_key_columns
                     }
 
-                    # Проверяем существование записи
+
                     existing_record = target_conn.execute(
                         select(target_table).filter_by(**primary_key_condition)
                     ).first()
 
                     if existing_record:
-                        # Обновляем существующую запись
+
                         update_values = {
                             col.name: getattr(row, col.name)
                             for col in source_table.columns
@@ -91,7 +91,7 @@ class DatabaseSynchronizer:
                             .values(**update_values)
                         )
                     else:
-                        # Добавляем новую запись
+
                         insert_values = {
                             col.name: getattr(row, col.name)
                             for col in source_table.columns
@@ -114,7 +114,6 @@ class DatabaseSynchronizer:
         :param tables: Список таблиц для синхронизации. Если None, синхронизируются все таблицы
         """
         if tables is None:
-            # Получаем список всех таблиц из исходной БД
             self.source_metadata.reflect(bind=self.source_engine)
             tables = list(self.source_metadata.tables.keys())
 
@@ -133,12 +132,12 @@ class DatabaseSynchronizer:
 source_db_url = "postgresql://postgres:pampampam@localhost:5432/postgres"
 target_db_url = "postgresql://postgres:pumpumpum@localhost:5434/postgres"
 
-# Создание экземпляра синхронизатора
+
 synchronizer = DatabaseSynchronizer(source_db_url, target_db_url)
 
-# Синхронизация конкретных таблиц
+
 tables_to_sync = ['users']
 synchronizer.synchronize_database(tables_to_sync)
 
-# Или синхронизация всей базы данных
+# возможна синхронизация всей базы данных
 # synchronizer.synchronize_database()
