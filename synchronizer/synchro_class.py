@@ -6,7 +6,8 @@ from typing import List, Dict, AnyStr, Any
 from logger import LOG
 
 
-class DatabaseSynchronizer:
+class DatabaseSynchronizer(LOG):
+
     def __init__(self, source_db_url: str, target_db_url: str):
         """
         :param source_db_url: URL исходной (тестовой) базы данных
@@ -17,6 +18,7 @@ class DatabaseSynchronizer:
 
         self.source_metadata = MetaData()
         self.target_metadata = MetaData()
+        self.logger = LOG
 
 
 
@@ -108,7 +110,7 @@ class DatabaseSynchronizer:
                                 for col in all_columns
                             }
                             target_conn.execute(target_table.insert().values(new_record))
-                            LOG.info(
+                            self.logger.info(
                                 f"Найдены различия в записи с ключом {primary_key_condition}. "
                                 f"Создана новая запись."
                             )
@@ -118,16 +120,16 @@ class DatabaseSynchronizer:
                             for col in all_columns
                         }
                         target_conn.execute(target_table.insert().values(new_record))
-                        LOG.info(
+                        self.logger.info(
                             f"Добавлена новая запись с ключом {primary_key_condition}"
                         )
 
                 target_conn.commit()
-                LOG.info(f"Таблица {table_name} успешно синхронизирована")
+                self.logger.info(f"Таблица {table_name} успешно синхронизирована")
 
 
         except Exception as e:
-            LOG.error(f"Ошибка при синхронизации таблицы {table_name}: {str(e)}")
+            self.logger.error(f"Ошибка при синхронизации таблицы {table_name}: {str(e)}")
             raise
 
 
@@ -142,23 +144,14 @@ class DatabaseSynchronizer:
             tables = list(self.source_metadata.tables.keys())
 
         for table_name in tables:
-            LOG.info(f"Начало синхронизации таблицы {table_name}")
+            self.logger.info(f"Начало синхронизации таблицы {table_name}")
             differences = self.get_table_differences(table_name)
 
             if any(differences.values()):
-                LOG.warning(
+                self.logger.warning(
                     f"Обнаружены различия в структуре таблицы {table_name}: {differences}"
                 )
 
             self.synchronize_table(table_name)
 
 
-s_db_url = "postgresql://ilyas_apunov:pampampam@localhost:5432/postgres"
-t_db_url = "postgresql://ilyas_apunov:pumpumpum@localhost:5434/postgres"
-
-
-synchronizer = DatabaseSynchronizer(s_db_url, t_db_url)
-
-
-tables_to_sync = ['users']
-synchronizer.synchronize_database(tables_to_sync)
