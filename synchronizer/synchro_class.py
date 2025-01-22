@@ -1,6 +1,8 @@
-from sqlalchemy import create_engine, MetaData, Table
+import collections
+
+from sqlalchemy import create_engine, MetaData, Table, and_, inspect, Column
 from sqlalchemy.sql import select
-from typing import List, Dict
+from typing import List, Dict, AnyStr, Any
 from logger import LOG
 
 
@@ -18,7 +20,7 @@ class DatabaseSynchronizer:
 
 
 
-    def get_table_differences(self, table_name: str) -> Dict:
+    def get_table_differences(self, table_name: str) -> Dict[str, List[Any]]:
         """
         Получение различий между таблицами в обеих БД
         :param table_name: Имя таблицы для сравнения
@@ -50,62 +52,84 @@ class DatabaseSynchronizer:
 
     def synchronize_table(self, table_name: str) -> None:
         """
-        Синхронизация данных конкретной таблицы
+        Синхронизация данных таблицы с созданием новых записей при различиях
 
         :param table_name: Имя таблицы для синхронизации
         """
         try:
             source_table = Table(table_name, self.source_metadata, autoload_with=self.source_engine)
-            target_table = Table(table_name, self.target_metadata, autoload_with=self.target_engine)
+            inspector = inspect(self.target_engine)
+            if not inspector.has_table(table_name):
+                metadata_target = MetaData()
+                target_table = Table(table_name, metadata_target)
 
+                for column in source_table.columns:
+                    new_column = Column(
+                        column.name,
+                        column.type,
+                        primary_key=column.primary_key,
+                        nullable=column.nullable,
+                        unique=column.unique,
+                        index=column.index,
+                        default=column.default,
+                        server_default=column.server_default
+                    )
+                    target_table.append_column(new_column)
+                metadata_target.create_all(self.target_engine)
+
+            target_table = Table(table_name, self.target_metadata, autoload_with=self.target_engine)
 
             with self.source_engine.connect() as source_conn:
                 source_data = source_conn.execute(select(source_table)).fetchall()
 
-
             primary_key_columns = [key.name for key in source_table.primary_key]
+            all_columns = [col.name for col in source_table.columns]
 
-
-            with self.target_engine.connect() as target_conn:
-                for row in source_data:
-                    # Создаем условие для поиска записи по первичному ключу
-                    primary_key_condition = {
-                        col: getattr(row, col) for col in primary_key_columns
-                    }
-
+            with self.target_engine.begin() as target_conn:
+                for source_row in source_data:
+                    primary_key_condition = and_(*[
+                        getattr(target_table.c, col) == getattr(source_row, col)
+                        for col in primary_key_columns
+                    ])
 
                     existing_record = target_conn.execute(
-                        select(target_table).filter_by(**primary_key_condition)
+                        select(target_table).where(primary_key_condition)
                     ).first()
 
                     if existing_record:
-
-                        update_values = {
-                            col.name: getattr(row, col.name)
-                            for col in source_table.columns
-                            if col.name in [c.name for c in target_table.columns]
-                        }
-                        target_conn.execute(
-                            target_table.update()
-                            .filter_by(**primary_key_condition)
-                            .values(**update_values)
+                        records_match = all(
+                            getattr(source_row, col) == getattr(existing_record, col)
+                            for col in all_columns
                         )
-                    else:
 
-                        insert_values = {
-                            col.name: getattr(row, col.name)
-                            for col in source_table.columns
-                            if col.name in [c.name for c in target_table.columns]
+                        if not records_match:
+                            new_record = {
+                                col: getattr(source_row, col)
+                                for col in all_columns
+                            }
+                            target_conn.execute(target_table.insert().values(new_record))
+                            LOG.info(
+                                f"Найдены различия в записи с ключом {primary_key_condition}. "
+                                f"Создана новая запись."
+                            )
+                    else:
+                        new_record = {
+                            col: getattr(source_row, col)
+                            for col in all_columns
                         }
-                        target_conn.execute(target_table.insert().values(**insert_values))
+                        target_conn.execute(target_table.insert().values(new_record))
+                        LOG.info(
+                            f"Добавлена новая запись с ключом {primary_key_condition}"
+                        )
 
                 target_conn.commit()
+                LOG.info(f"Таблица {table_name} успешно синхронизирована")
 
-            LOG.info(f"Таблица {table_name} успешно синхронизирована")
 
         except Exception as e:
             LOG.error(f"Ошибка при синхронизации таблицы {table_name}: {str(e)}")
             raise
+
 
     def synchronize_database(self, tables: List[str] = None) -> None:
         """
@@ -129,15 +153,12 @@ class DatabaseSynchronizer:
             self.synchronize_table(table_name)
 
 
-source_db_url = "postgresql://postgres:pampampam@localhost:5432/postgres"
-target_db_url = "postgresql://postgres:pumpumpum@localhost:5434/postgres"
+s_db_url = "postgresql://postgres:pampampam@localhost:5432/postgres"
+t_db_url = "postgresql://postgres:pumpumpum@localhost:5434/postgres"
 
 
-synchronizer = DatabaseSynchronizer(source_db_url, target_db_url)
+synchronizer = DatabaseSynchronizer(s_db_url, t_db_url)
 
 
 tables_to_sync = ['users']
 synchronizer.synchronize_database(tables_to_sync)
-
-# возможна синхронизация всей базы данных
-# synchronizer.synchronize_database()
