@@ -22,7 +22,7 @@ class DatabaseSynchronizer(LOG):
 
 
 
-    def get_table_differences(self, table_name: str) -> Dict[str, List[Any]]:
+    def _get_table_differences(self, table_name: str) -> Dict[str, List[Any]]:
         """
         Получение различий между таблицами в обеих БД
         :param table_name: Имя таблицы для сравнения
@@ -52,7 +52,7 @@ class DatabaseSynchronizer(LOG):
 
         return differences
 
-    def synchronize_table(self, table_name: str) -> None:
+    def _synchronize_table(self, table_name: str) -> None:
         """
         Синхронизация данных таблицы с созданием новых записей при различиях
 
@@ -145,13 +145,13 @@ class DatabaseSynchronizer(LOG):
 
         for table_name in tables:
             self.logger.info(f"Начало синхронизации таблицы {table_name}")
-            differences = self.get_table_differences(table_name)
+            differences = self._get_table_differences(table_name)
 
             if any(differences.values()):
                 self.logger.warning(
                     f"Обнаружены различия в структуре таблицы {table_name}: {differences}"
                 )
 
-            self.synchronize_table(table_name)
+            self._synchronize_table(table_name)
 
 
