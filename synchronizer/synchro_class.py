@@ -153,8 +153,8 @@ class DatabaseSynchronizer:
             self.synchronize_table(table_name)
 
 
-s_db_url = "postgresql://postgres:pampampam@localhost:5432/postgres"
-t_db_url = "postgresql://postgres:pumpumpum@localhost:5434/postgres"
+s_db_url = "postgresql://ilyas_apunov:pampampam@localhost:5432/postgres"
+t_db_url = "postgresql://ilyas_apunov:pumpumpum@localhost:5434/postgres"
 
 
 synchronizer = DatabaseSynchronizer(s_db_url, t_db_url)

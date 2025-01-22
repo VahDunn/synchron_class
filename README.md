@@ -8,8 +8,8 @@
 В моем случае это postgres версии 15. 
 Предположим, что они реализованы через Docker - создано два контейнера на разных портах (5432 и 5434).
 Строки для доступа к ним: 
-source_db_url = "postgresql://postgres:pampampam@localhost:5432/postgres"
-target_db_url = "postgresql://postgres:pumpumpum@localhost:5434/postgres"
+source_db_url = "postgresql://ilyas_apunov:pampampam@localhost:5432/postgres"
+target_db_url = "postgresql://ilyas_apunov:pumpumpum@localhost:5434/postgres"
 В самом классе они захардкожены, но по-хорошему их нужно реализовывать через переменные окружения (.env).
 
 То есть требуется создать файл .env, добавить в него соответствующие строки, а сам скрипт запускать с указанием 
