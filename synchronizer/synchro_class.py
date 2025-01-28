@@ -1,12 +1,10 @@
-import collections
-
 from sqlalchemy import create_engine, MetaData, Table, and_, inspect, Column
 from sqlalchemy.sql import select
-from typing import List, Dict, AnyStr, Any
+from typing import List, Dict, Any
 from logger import LOG
 
 
-class DatabaseSynchronizer(LOG):
+class DatabaseSynchronizer:
 
     def __init__(self, source_db_url: str, target_db_url: str):
         """
@@ -52,6 +50,28 @@ class DatabaseSynchronizer(LOG):
 
         return differences
 
+
+    def _create_table_if_not_exists(self, source_table, table_name: str) -> None:
+        inspector = inspect(self.target_engine)
+        if not inspector.has_table(table_name):
+            metadata_target = MetaData()
+            target_table = Table(table_name, metadata_target)
+
+            for column in source_table.columns:
+                new_column = Column(
+                    column.name,
+                    column.type,
+                    primary_key=column.primary_key,
+                    nullable=column.nullable,
+                    unique=column.unique,
+                    index=column.index,
+                    default=column.default,
+                    server_default=column.server_default
+                )
+                target_table.append_column(new_column)
+            metadata_target.create_all(self.target_engine)
+
+
     def _synchronize_table(self, table_name: str) -> None:
         """
         Синхронизация данных таблицы с созданием новых записей при различиях
@@ -60,6 +80,7 @@ class DatabaseSynchronizer(LOG):
         """
         try:
             source_table = Table(table_name, self.source_metadata, autoload_with=self.source_engine)
+            self._create_table_if_not_exists(self, source_table, table_name)
             inspector = inspect(self.target_engine)
             if not inspector.has_table(table_name):
                 metadata_target = MetaData()
